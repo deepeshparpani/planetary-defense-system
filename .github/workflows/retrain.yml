@@ -12,7 +12,7 @@ on:
 
 jobs:
   # Job 1: Continuous Integration (CI)
-  # This job ensures the codebase is healthy and dependencies are valid
+  # Validates dependencies and environment on every push
   validate_and_test:
     runs-on: ubuntu-latest
     steps:
@@ -32,21 +32,42 @@ jobs:
 
       - name: Verify Environment
         run: |
-          echo "Environment validation successful. Dependencies are compatible."
+          echo "CI validation successful. Environment is healthy."
 
-  # Job 2: Continuous Training & Deployment (CD)
-  # This job retrains the model using the latest NASA NeoWs data
+  # Job 2: Continuous Deployment (CD) to Google Cloud
+  # Automatically triggers Cloud Build on pushes to main
+  deploy_to_gcp:
+    needs: validate_and_test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Auth to Google Cloud
+        uses: 'google-github-actions/auth@v2'
+        with:
+          # You must add this JSON key to your GitHub Secrets as GCP_SA_KEY
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: 'Set up Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@v2'
+
+      - name: 'Trigger Cloud Build'
+        run: |
+          # This uses your cloudbuild.yaml to build the image and update Cloud Run
+          gcloud builds submit --config cloudbuild.yaml .
+
+  # Job 3: Continuous Training (CT)
+  # Retrains the model on a schedule or manual trigger
   retrain_and_update:
     needs: validate_and_test
-    # Only run the automated retraining on schedule or manual trigger
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          # Required to allow the action to push changes back to the repo
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python 3.11
@@ -64,18 +85,12 @@ jobs:
         env:
           NASA_API_KEY: ${{ secrets.NASA_API_KEY }}
         run: |
-          # Executes the SMOTE-XGBoost training script
           python scripts/train.py
 
-      - name: Deploy Updated Model
+      - name: Commit New Model Weights
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          
-          # Stage the new model binary and check for changes
-          if git add models/neo_classifier.joblib && git commit -m "chore(mlops): auto-update model weights with latest NASA observations"; then
+          if git add models/neo_classifier.joblib && git commit -m "chore(mlops): auto-update model weights"; then
             git push
-            echo "New model deployed successfully."
-          else
-            echo "No changes detected in model performance or data. Deployment skipped."
           fi

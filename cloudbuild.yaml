@@ -1,0 +1,54 @@
+steps:
+  # Step 1: Build the unified container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build', 
+      '-t', 'us-central1-docker.pkg.dev/planetary-defense-system/asteroid-repo/unified-app:latest', 
+      '.'
+    ]
+
+  # Step 2: Push the image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'us-central1-docker.pkg.dev/planetary-defense-system/asteroid-repo/unified-app:latest']
+
+  # Step 3: Deploy the Backend (FastAPI)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'asteroid-backend'
+      - '--image'
+      - 'us-central1-docker.pkg.dev/planetary-defense-system/asteroid-repo/unified-app:latest'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--port'
+      - '8000'
+
+  # Step 4: Deploy the Frontend (Streamlit)
+  # We override the entrypoint to run Streamlit instead of FastAPI
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'asteroid-frontend'
+      - '--image'
+      - 'us-central1-docker.pkg.dev/planetary-defense-system/asteroid-repo/unified-app:latest'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--command'
+      - 'streamlit'
+      - '--args'
+      - 'run,frontend/app.py,--server.port,8080,--server.address,0.0.0.0'
+      - '--set-env-vars'
+      - 'BACKEND_URL=https://asteroid-backend-617598390128.us-central1.run.app'
+
+images:
+  - 'us-central1-docker.pkg.dev/planetary-defense-system/asteroid-repo/unified-app:latest'
