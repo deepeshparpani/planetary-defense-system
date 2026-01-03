@@ -3,6 +3,7 @@ steps:
   # If the model is missing, this runs the training script to generate it
   - name: 'python:3.11-slim'
     entrypoint: 'bash'
+    timeout: '600s'
     args:
       - '-c'
       - |
@@ -73,6 +74,12 @@ steps:
 # Fixes the logging permissions issue for GitHub Actions
 options:
   logging: CLOUD_LOGGING_ONLY
+
+# Explicitly track the model as a build artifact
+artifacts:
+  objects:
+    location: 'gs://${PROJECT_ID}_cloudbuild/models/'
+    paths: ['models/neo_classifier.joblib']
 
 images:
   - 'us-central1-docker.pkg.dev/$PROJECT_ID/asteroid-repo/unified-app:latest'

@@ -1,0 +1,7 @@
+[
+  {
+    "name": "keep-last-3-versions",
+    "action": {"type": "Keep"},
+    "mostRecentVersions": {"keepCount": 3}
+  }
+]

@@ -16,6 +16,7 @@ def check_service(name, url):
 
     print(f"Checking {name} at {url}...", end=" ", flush=True)
     try:
+        # Using a 15s timeout to account for Cloud Run 'cold starts'
         response = requests.get(url, timeout=15)
         if response.status_code == 200:
             print("✅ ONLINE")
@@ -48,7 +49,7 @@ def check_end_to_end():
         
         if response.status_code == 200:
             data = response.json()
-            # Safety check for the 'probability' key to avoid the error you encountered
+            # Safety check for the 'probability' key to avoid schema errors
             prob = data.get('probability')
             is_haz = data.get('is_hazardous')
             
